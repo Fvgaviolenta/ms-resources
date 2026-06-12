@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: ${MS_RESOURCES_DB_URL}
+    username: ${MS_RESOURCES_DB_USER}
+    password: ${MS_RESOURCES_DB_PASSWORD}
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASS}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+
+catastrofescl:
+  firebase:
+    enabled: ${FIREBASE_ENABLED:true}
+    project-id: ${FIREBASE_PROJECT_ID}
+    credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
+  auth:
+    dev-mode: false
+  cors:
+    allowed-origins:
+      - ${FRONTEND_ORIGIN:https://catastrofescl.vercel.app}
