@@ -1,0 +1,96 @@
+# ===========================
+# Maven
+# ===========================
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ===========================
+# Gradle (por si se usa a futuro)
+# ===========================
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ===========================
+# Java / compilados
+# ===========================
+*.class
+*.log
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+!**/src/main/**/*.jar
+!**/src/test/**/*.jar
+
+# ===========================
+# Spring Boot
+# ===========================
+*.original
+
+# ===========================
+# IDE - IntelliJ IDEA
+# ===========================
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ===========================
+# IDE - Eclipse / STS
+# ===========================
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# ===========================
+# IDE - VS Code
+# ===========================
+.vscode/
+
+# ===========================
+# IDE - NetBeans
+# ===========================
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# ===========================
+# Sistema operativo
+# ===========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===========================
+# Variables de entorno y secretos
+# ===========================
+.env
+.env.*
+!.env.example
+
+# Credenciales Firebase (Service Account)
+*firebase-adminsdk*.json
+*-firebase-adminsdk-*.json
+google-services.json
+serviceAccountKey.json
+/secrets/
