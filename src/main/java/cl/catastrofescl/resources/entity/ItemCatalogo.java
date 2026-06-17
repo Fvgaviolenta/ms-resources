@@ -2,8 +2,6 @@ package cl.catastrofescl.resources.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -32,9 +30,8 @@ public class ItemCatalogo {
     @Column(name = "nombre", nullable = false, length = 200)
     private String nombre;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "categoria", nullable = false, length = 50)
-    private CategoriaInventario categoria;
+    @Column(name = "categoria_id", nullable = false)
+    private UUID categoriaId;
 
     @Column(name = "descripcion", length = 500)
     private String descripcion;

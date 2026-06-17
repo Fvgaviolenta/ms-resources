@@ -1,9 +1,7 @@
 package cl.catastrofescl.resources.service;
 
 import cl.catastrofescl.resources.dto.response.CentroResponse;
-import cl.catastrofescl.resources.dto.response.InventarioCategoriaResponse;
 import cl.catastrofescl.resources.entity.Centro;
-import cl.catastrofescl.resources.entity.Inventario;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -28,20 +26,6 @@ public class MapeadorCentros {
                 centro.getCreadoPorUsuarioId(),
                 centro.getCreadoEn(),
                 centro.getActualizadoEn()
-        );
-    }
-
-    public InventarioCategoriaResponse aInventarioResponse(Inventario inventario) {
-        return new InventarioCategoriaResponse(
-                inventario.getId(),
-                inventario.getCentroId(),
-                inventario.getCategoria(),
-                inventario.getStockActual(),
-                inventario.getUmbralMinimo(),
-                inventario.getUmbralOptimo(),
-                inventario.getUmbralMaximo(),
-                inventario.getEstadoCriticidad(),
-                inventario.getActualizadoEn()
         );
     }
 }

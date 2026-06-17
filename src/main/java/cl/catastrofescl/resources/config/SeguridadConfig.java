@@ -50,6 +50,7 @@ public class SeguridadConfig {
                         .requestMatchers(HttpMethod.GET, "/centros").permitAll()
                         .requestMatchers(HttpMethod.GET, "/centros/cercanos").permitAll()
                         .requestMatchers(HttpMethod.GET, "/centros/map-data").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/categorias").permitAll()
                         .requestMatchers(HttpMethod.GET, "/catalogo/items").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()

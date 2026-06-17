@@ -33,21 +33,20 @@ public class Inventario {
     @Column(name = "centro_id", nullable = false)
     private UUID centroId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "categoria", nullable = false, length = 50)
-    private CategoriaInventario categoria;
+    @Column(name = "item_catalogo_id", nullable = false)
+    private UUID itemCatalogoId;
 
     @Column(name = "stock_actual", nullable = false)
-    private int stockActual;
+    private long stockActual;
 
     @Column(name = "umbral_minimo", nullable = false)
-    private int umbralMinimo;
+    private long umbralMinimo;
 
     @Column(name = "umbral_optimo", nullable = false)
-    private int umbralOptimo;
+    private long umbralOptimo;
 
     @Column(name = "umbral_maximo", nullable = false)
-    private int umbralMaximo;
+    private long umbralMaximo;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_criticidad", nullable = false, length = 30)

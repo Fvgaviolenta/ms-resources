@@ -5,6 +5,9 @@ import cl.catastrofescl.resources.entity.CategoriaInventario;
 import cl.catastrofescl.resources.entity.Centro;
 import cl.catastrofescl.resources.entity.EstadoCriticidad;
 import cl.catastrofescl.resources.entity.Inventario;
+import cl.catastrofescl.resources.entity.ItemCatalogo;
+import cl.catastrofescl.resources.repository.RepositorioCatalogoItems;
+import cl.catastrofescl.resources.repository.RepositorioCategorias;
 import cl.catastrofescl.resources.repository.RepositorioCentros;
 import cl.catastrofescl.resources.repository.RepositorioInventario;
 import lombok.RequiredArgsConstructor;
@@ -30,24 +33,31 @@ public class ServicioSugerenciasRedistribucion {
 
     private final RepositorioInventario repositorioInventario;
     private final RepositorioCentros repositorioCentros;
+    private final RepositorioCatalogoItems repositorioCatalogoItems;
+    private final RepositorioCategorias repositorioCategorias;
 
     @Transactional(readOnly = true)
     public List<SugerenciaRedistribucionResponse> sugerir(CategoriaInventario categoria, int limite) {
-        List<Inventario> demandantes = repositorioInventario.buscarPorCriticidad(categoria, ESTADOS_DEMANDA);
-        List<Inventario> oferentes = repositorioInventario.buscarPorCriticidad(categoria, ESTADOS_OFERTA);
+        String codigoCategoria = categoria != null ? categoria.name() : null;
+        List<Inventario> demandantes = repositorioInventario.buscarPorCriticidad(codigoCategoria, ESTADOS_DEMANDA);
+        List<Inventario> oferentes = repositorioInventario.buscarPorCriticidad(codigoCategoria, ESTADOS_OFERTA);
 
         if (demandantes.isEmpty() || oferentes.isEmpty()) {
             return List.of();
         }
 
+        Map<UUID, ItemCatalogo> items = cargarItems(demandantes, oferentes);
         Map<UUID, Centro> centros = cargarCentros(demandantes, oferentes);
+        Map<UUID, String> codigosCategoriaPorItem = repositorioCategorias.findAll().stream()
+                .collect(Collectors.toMap(c -> c.getId(), c -> c.getCodigo()));
         List<SugerenciaRedistribucionResponse> sugerencias = new ArrayList<>();
 
         for (Inventario demanda : demandantes) {
             SugerenciaRedistribucionResponse mejor = oferentes.stream()
+                    .filter(oferta -> oferta.getItemCatalogoId().equals(demanda.getItemCatalogoId()))
                     .filter(oferta -> oferta.getCentroId() != null
                             && !oferta.getCentroId().equals(demanda.getCentroId()))
-                    .map(oferta -> construirSugerencia(demanda, oferta, centros))
+                    .map(oferta -> construirSugerencia(demanda, oferta, centros, items, categoria, codigosCategoriaPorItem))
                     .min(Comparator.comparingDouble(SugerenciaRedistribucionResponse::distanciaMetros))
                     .orElse(null);
 
@@ -62,6 +72,14 @@ public class ServicioSugerenciasRedistribucion {
                 .toList();
     }
 
+    private Map<UUID, ItemCatalogo> cargarItems(List<Inventario> demandantes, List<Inventario> oferentes) {
+        List<UUID> ids = new ArrayList<>();
+        demandantes.forEach(i -> ids.add(i.getItemCatalogoId()));
+        oferentes.forEach(i -> ids.add(i.getItemCatalogoId()));
+        return repositorioCatalogoItems.findByIdIn(ids.stream().distinct().toList()).stream()
+                .collect(Collectors.toMap(ItemCatalogo::getId, Function.identity()));
+    }
+
     private Map<UUID, Centro> cargarCentros(List<Inventario> demandantes, List<Inventario> oferentes) {
         List<UUID> ids = new ArrayList<>();
         demandantes.forEach(i -> ids.add(i.getCentroId()));
@@ -71,18 +89,32 @@ public class ServicioSugerenciasRedistribucion {
     }
 
     private SugerenciaRedistribucionResponse construirSugerencia(
-            Inventario demanda, Inventario oferta, Map<UUID, Centro> centros) {
+            Inventario demanda,
+            Inventario oferta,
+            Map<UUID, Centro> centros,
+            Map<UUID, ItemCatalogo> items,
+            CategoriaInventario categoriaFiltro,
+            Map<UUID, String> codigosCategoriaPorItem) {
         Centro centroOrigen = centros.get(oferta.getCentroId());
         Centro centroDestino = centros.get(demanda.getCentroId());
+        ItemCatalogo item = items.get(demanda.getItemCatalogoId());
         Double distanciaMetros = repositorioCentros.distanciaMetrosEntreCentros(
                 oferta.getCentroId(), demanda.getCentroId());
 
-        int deficit = Math.max(0, demanda.getUmbralOptimo() - demanda.getStockActual());
-        int excedente = Math.max(0, oferta.getStockActual() - oferta.getUmbralOptimo());
-        int cantidadSugerida = Math.min(deficit, excedente);
+        long deficit = Math.max(0L, demanda.getUmbralOptimo() - demanda.getStockActual());
+        long excedente = Math.max(0L, oferta.getStockActual() - oferta.getUmbralOptimo());
+        long cantidadSugerida = Math.min(deficit, excedente);
+
+        CategoriaInventario categoria = categoriaFiltro != null
+                ? categoriaFiltro
+                : (item != null && codigosCategoriaPorItem.containsKey(item.getCategoriaId())
+                ? ServicioInventario.aCategoriaInventario(codigosCategoriaPorItem.get(item.getCategoriaId()))
+                : CategoriaInventario.ARTICULOS_VARIOS);
 
         return new SugerenciaRedistribucionResponse(
-                demanda.getCategoria(),
+                categoria,
+                demanda.getItemCatalogoId(),
+                item != null ? item.getNombre() : "Item",
                 oferta.getCentroId(),
                 centroOrigen != null ? centroOrigen.getNombre() : "Centro origen",
                 oferta.getStockActual(),

@@ -1,17 +1,19 @@
 package cl.catastrofescl.resources.dto.response;
 
-import cl.catastrofescl.resources.entity.CategoriaInventario;
 import cl.catastrofescl.resources.entity.EstadoCriticidad;
 import cl.catastrofescl.resources.entity.TipoMovimiento;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 public record RespuestaMovimientoInventarioResponse(
-        CategoriaInventario categoria,
+        UUID itemCatalogoId,
+        String itemNombre,
+        String codigoCategoria,
         TipoMovimiento tipoMovimiento,
-        int cantidad,
-        int stockAnterior,
-        int stockActual,
+        long cantidad,
+        long stockAnterior,
+        long stockActual,
         EstadoCriticidad estadoCriticidad,
         OffsetDateTime actualizadoEn
 ) {

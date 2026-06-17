@@ -29,9 +29,10 @@ public class StockActualizadoEvento implements EventoDominio {
 
     private UUID inventarioId;
     private UUID centroId;
+    private UUID itemCatalogoId;
     private CategoriaInventario categoria;
-    private int stockAnterior;
-    private int stockActual;
+    private long stockAnterior;
+    private long stockActual;
     private EstadoCriticidad estadoCriticidad;
 
     @Override
