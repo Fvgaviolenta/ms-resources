@@ -5,7 +5,6 @@ import cl.catastrofescl.resources.entity.CategoriaInventario;
 import cl.catastrofescl.resources.entity.ItemCatalogo;
 import cl.catastrofescl.resources.repository.RepositorioCatalogoItems;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +19,6 @@ public class ServicioCatalogoItems {
     private final RepositorioCatalogoItems repositorioCatalogoItems;
 
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_CATALOGO, key = "'all'")
     public List<ItemCatalogoResponse> listarActivos() {
         return repositorioCatalogoItems.findByActivoTrueOrderByCategoriaAscNombreAsc().stream()
                 .map(this::aResponse)
@@ -28,7 +26,6 @@ public class ServicioCatalogoItems {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_CATALOGO, key = "#categoria.name()")
     public List<ItemCatalogoResponse> listarPorCategoria(CategoriaInventario categoria) {
         return repositorioCatalogoItems.findByCategoriaAndActivoTrueOrderByNombreAsc(categoria).stream()
                 .map(this::aResponse)
