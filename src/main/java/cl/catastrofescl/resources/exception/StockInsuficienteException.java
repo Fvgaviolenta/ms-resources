@@ -2,7 +2,7 @@ package cl.catastrofescl.resources.exception;
 
 public class StockInsuficienteException extends RuntimeException {
 
-    public StockInsuficienteException(int stockActual, int cantidadSolicitada) {
+    public StockInsuficienteException(long stockActual, long cantidadSolicitada) {
         super("Stock insuficiente: actual=" + stockActual + ", solicitado=" + cantidadSolicitada);
     }
 }

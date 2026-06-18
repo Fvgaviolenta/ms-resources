@@ -48,7 +48,32 @@ public class ManejadorGlobalExcepciones {
                 ex.getMessage(), "inventory-not-found", request);
         detalle.setProperty("errorCode", "INVENTORY_NOT_FOUND");
         detalle.setProperty("centroId", ex.getCentroId());
-        detalle.setProperty("categoria", ex.getCategoria());
+        detalle.setProperty("itemCatalogoId", ex.getItemCatalogoId());
+        return detalle;
+    }
+
+    @ExceptionHandler(CategoriaNoEncontradaException.class)
+    public ProblemDetail manejarCategoriaNoEncontrada(CategoriaNoEncontradaException ex, HttpServletRequest request) {
+        ProblemDetail detalle = base(HttpStatus.NOT_FOUND, "Categoria no encontrada",
+                ex.getMessage(), "category-not-found", request);
+        detalle.setProperty("errorCode", "CATEGORY_NOT_FOUND");
+        return detalle;
+    }
+
+    @ExceptionHandler(CategoriaDuplicadaException.class)
+    public ProblemDetail manejarCategoriaDuplicada(CategoriaDuplicadaException ex, HttpServletRequest request) {
+        ProblemDetail detalle = base(HttpStatus.CONFLICT, "Categoria duplicada",
+                ex.getMessage(), "category-duplicate", request);
+        detalle.setProperty("errorCode", "CATEGORY_DUPLICATE");
+        return detalle;
+    }
+
+    @ExceptionHandler(ItemCatalogoNoEncontradoException.class)
+    public ProblemDetail manejarItemCatalogoNoEncontrado(ItemCatalogoNoEncontradoException ex, HttpServletRequest request) {
+        ProblemDetail detalle = base(HttpStatus.NOT_FOUND, "Item de catalogo no encontrado",
+                ex.getMessage(), "catalog-item-not-found", request);
+        detalle.setProperty("errorCode", "CATALOG_ITEM_NOT_FOUND");
+        detalle.setProperty("itemCatalogoId", ex.getItemCatalogoId());
         return detalle;
     }
 

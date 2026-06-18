@@ -35,6 +35,9 @@ public class MovimientoInventario {
     @Column(name = "centro_id", nullable = false)
     private UUID centroId;
 
+    @Column(name = "item_catalogo_id", nullable = false)
+    private UUID itemCatalogoId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "categoria", nullable = false, length = 50)
     private CategoriaInventario categoria;
@@ -44,13 +47,13 @@ public class MovimientoInventario {
     private TipoMovimiento tipoMovimiento;
 
     @Column(name = "cantidad", nullable = false)
-    private int cantidad;
+    private long cantidad;
 
     @Column(name = "stock_anterior", nullable = false)
-    private int stockAnterior;
+    private long stockAnterior;
 
     @Column(name = "stock_posterior", nullable = false)
-    private int stockPosterior;
+    private long stockPosterior;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_criticidad_posterior", nullable = false, length = 30)

@@ -31,11 +31,12 @@ public class MovimientoInventarioRegistradoEvento implements EventoDominio {
     private UUID movimientoId;
     private UUID inventarioId;
     private UUID centroId;
+    private UUID itemCatalogoId;
     private CategoriaInventario categoria;
     private TipoMovimiento tipoMovimiento;
-    private int cantidad;
-    private int stockAnterior;
-    private int stockPosterior;
+    private long cantidad;
+    private long stockAnterior;
+    private long stockPosterior;
     private EstadoCriticidad estadoCriticidadPosterior;
     private UUID registradoPorUsuarioId;
 

@@ -7,15 +7,17 @@ import java.util.UUID;
 
 public record SugerenciaRedistribucionResponse(
         CategoriaInventario categoria,
+        UUID itemCatalogoId,
+        String itemNombre,
         UUID centroOrigenId,
         String centroOrigenNombre,
-        int stockOrigen,
+        long stockOrigen,
         EstadoCriticidad criticidadOrigen,
         UUID centroDestinoId,
         String centroDestinoNombre,
-        int stockDestino,
+        long stockDestino,
         EstadoCriticidad criticidadDestino,
         double distanciaMetros,
-        int cantidadSugerida
+        long cantidadSugerida
 ) {
 }

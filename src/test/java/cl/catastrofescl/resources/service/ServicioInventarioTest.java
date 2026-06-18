@@ -20,7 +20,9 @@ class ServicioInventarioTest {
     @Mock
     private cl.catastrofescl.resources.repository.RepositorioCentros repositorioCentros;
     @Mock
-    private MapeadorCentros mapeadorCentros;
+    private cl.catastrofescl.resources.repository.RepositorioCatalogoItems repositorioCatalogoItems;
+    @Mock
+    private cl.catastrofescl.resources.repository.RepositorioCategorias repositorioCategorias;
     @Mock
     private PublicadorEventos publicadorEventos;
     @Mock
@@ -34,7 +36,8 @@ class ServicioInventarioTest {
                 repositorioInventario,
                 repositorioMovimientosInventario,
                 repositorioCentros,
-                mapeadorCentros,
+                repositorioCatalogoItems,
+                repositorioCategorias,
                 publicadorEventos,
                 contextoUsuario
         );
@@ -43,10 +46,10 @@ class ServicioInventarioTest {
     @Test
     void calcularCriticidadAgotadoCuandoStockCero() {
         Inventario inventario = Inventario.builder()
-                .stockActual(0)
-                .umbralMinimo(10)
-                .umbralOptimo(50)
-                .umbralMaximo(200)
+                .stockActual(0L)
+                .umbralMinimo(10L)
+                .umbralOptimo(50L)
+                .umbralMaximo(200L)
                 .build();
         assertThat(servicio.calcularCriticidad(inventario)).isEqualTo(EstadoCriticidad.AGOTADO);
     }
@@ -54,10 +57,10 @@ class ServicioInventarioTest {
     @Test
     void calcularCriticidadCriticoCuandoStockBajoMinimo() {
         Inventario inventario = Inventario.builder()
-                .stockActual(5)
-                .umbralMinimo(10)
-                .umbralOptimo(50)
-                .umbralMaximo(200)
+                .stockActual(5L)
+                .umbralMinimo(10L)
+                .umbralOptimo(50L)
+                .umbralMaximo(200L)
                 .build();
         assertThat(servicio.calcularCriticidad(inventario)).isEqualTo(EstadoCriticidad.CRITICO);
     }
@@ -65,10 +68,10 @@ class ServicioInventarioTest {
     @Test
     void calcularCriticidadSobrestockCuandoSuperaMaximo() {
         Inventario inventario = Inventario.builder()
-                .stockActual(250)
-                .umbralMinimo(10)
-                .umbralOptimo(50)
-                .umbralMaximo(200)
+                .stockActual(250L)
+                .umbralMinimo(10L)
+                .umbralOptimo(50L)
+                .umbralMaximo(200L)
                 .build();
         assertThat(servicio.calcularCriticidad(inventario)).isEqualTo(EstadoCriticidad.SOBRESTOCK);
     }

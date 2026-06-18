@@ -15,32 +15,29 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "catalogo_items")
+@Table(name = "categorias")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ItemCatalogo {
+public class Categoria {
 
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
-    @Column(name = "nombre", nullable = false, length = 200)
+    @Column(name = "codigo", nullable = false, unique = true, length = 50)
+    private String codigo;
+
+    @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
-
-    @Column(name = "categoria_id", nullable = false)
-    private UUID categoriaId;
-
-    @Column(name = "descripcion", length = 500)
-    private String descripcion;
-
-    @Column(name = "unidad_medida", nullable = false, length = 30)
-    private String unidadMedida;
 
     @Column(name = "activo", nullable = false)
     private boolean activo;
+
+    @Column(name = "orden", nullable = false)
+    private int orden;
 
     @Column(name = "creado_en", nullable = false)
     private OffsetDateTime creadoEn;

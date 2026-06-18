@@ -1,6 +1,5 @@
 package cl.catastrofescl.resources.repository;
 
-import cl.catastrofescl.resources.entity.CategoriaInventario;
 import cl.catastrofescl.resources.entity.EstadoCriticidad;
 import cl.catastrofescl.resources.entity.Inventario;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,21 +12,40 @@ import java.util.UUID;
 
 public interface RepositorioInventario extends JpaRepository<Inventario, UUID> {
 
-    List<Inventario> findByCentroIdOrderByCategoriaAsc(UUID centroId);
+    List<Inventario> findByCentroIdOrderByItemCatalogoIdAsc(UUID centroId);
 
-    Optional<Inventario> findByCentroIdAndCategoria(UUID centroId, CategoriaInventario categoria);
-
-    List<Inventario> findByCategoriaAndEstadoCriticidadIn(
-            CategoriaInventario categoria, List<EstadoCriticidad> estados);
+    Optional<Inventario> findByCentroIdAndItemCatalogoId(UUID centroId, UUID itemCatalogoId);
 
     @Query("""
             SELECT i FROM Inventario i
+            INNER JOIN ItemCatalogo ic ON ic.id = i.itemCatalogoId
+            INNER JOIN Categoria cat ON cat.id = ic.categoriaId
             WHERE i.estadoCriticidad IN :estados
-            AND (:categoria IS NULL OR i.categoria = :categoria)
+            AND (:codigoCategoria IS NULL OR cat.codigo = :codigoCategoria)
             """)
     List<Inventario> buscarPorCriticidad(
-            @Param("categoria") CategoriaInventario categoria,
+            @Param("codigoCategoria") String codigoCategoria,
             @Param("estados") List<EstadoCriticidad> estados);
 
     long countByEstadoCriticidadIn(List<EstadoCriticidad> estados);
+
+    @Query(value = """
+            SELECT cat.codigo AS codigoCategoria,
+                   cat.nombre AS nombreCategoria,
+                   COALESCE(SUM(i.stock_actual), 0) AS stockTotal,
+                   CASE
+                       WHEN bool_or(i.estado_criticidad = 'AGOTADO') THEN 'AGOTADO'
+                       WHEN bool_or(i.estado_criticidad = 'CRITICO') THEN 'CRITICO'
+                       WHEN bool_or(i.estado_criticidad = 'SOBRESTOCK') THEN 'SOBRESTOCK'
+                       WHEN bool_or(i.estado_criticidad = 'ABUNDANTE') THEN 'ABUNDANTE'
+                       ELSE 'NORMAL'
+                   END AS estadoCriticidadAgregado
+            FROM inventario i
+            INNER JOIN catalogo_items ci ON ci.id = i.item_catalogo_id
+            INNER JOIN categorias cat ON cat.id = ci.categoria_id
+            WHERE i.centro_id = :centroId
+            GROUP BY cat.id, cat.codigo, cat.nombre, cat.orden
+            ORDER BY cat.orden
+            """, nativeQuery = true)
+    List<ProyeccionResumenInventarioCategoria> resumenPorCategoria(@Param("centroId") UUID centroId);
 }

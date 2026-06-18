@@ -7,8 +7,9 @@ import cl.catastrofescl.resources.dto.request.CrearCentroRequest;
 import cl.catastrofescl.resources.dto.request.SolicitudMovimientoInventarioRequest;
 import cl.catastrofescl.resources.dto.response.CentroResponse;
 import cl.catastrofescl.resources.dto.response.ColeccionMapaCentrosResponse;
-import cl.catastrofescl.resources.dto.response.InventarioCategoriaResponse;
+import cl.catastrofescl.resources.dto.response.InventarioItemResponse;
 import cl.catastrofescl.resources.dto.response.OperadorCentroResponse;
+import cl.catastrofescl.resources.dto.response.ResumenInventarioCategoriaResponse;
 import cl.catastrofescl.resources.dto.response.RespuestaMovimientoInventarioResponse;
 import cl.catastrofescl.resources.service.ServicioCentros;
 import cl.catastrofescl.resources.service.ServicioInventario;
@@ -39,7 +40,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "Centros", description = "Centros de acopio e inventario por categoria")
+@Tag(name = "Centros", description = "Centros de acopio e inventario por item")
 @RestController
 @RequestMapping("/centros")
 @RequiredArgsConstructor
@@ -105,14 +106,21 @@ public class ControladorCentros {
         return servicioCentros.actualizar(id, solicitud);
     }
 
-    @Operation(summary = "Inventario por las 6 categorias del centro")
+    @Operation(summary = "Inventario por item del centro")
     @GetMapping("/{id}/inventario")
     @PreAuthorize("isAuthenticated()")
-    public List<InventarioCategoriaResponse> listarInventario(@PathVariable UUID id) {
+    public List<InventarioItemResponse> listarInventario(@PathVariable UUID id) {
         return servicioInventario.listarPorCentro(id);
     }
 
-    @Operation(summary = "Registra ingreso o egreso por categoria")
+    @Operation(summary = "Resumen agregado de inventario por categoria")
+    @GetMapping("/{id}/inventario/resumen-categorias")
+    @PreAuthorize("isAuthenticated()")
+    public List<ResumenInventarioCategoriaResponse> resumenInventarioPorCategoria(@PathVariable UUID id) {
+        return servicioInventario.resumenPorCategoria(id);
+    }
+
+    @Operation(summary = "Registra ingreso o egreso por item de catalogo")
     @PostMapping("/{id}/inventario/movimientos")
     @PreAuthorize("hasAuthority('INVENTARIO_GESTIONAR')")
     public RespuestaMovimientoInventarioResponse registrarMovimiento(
@@ -121,10 +129,10 @@ public class ControladorCentros {
         return servicioInventario.registrarMovimiento(id, solicitud);
     }
 
-    @Operation(summary = "Actualiza umbrales de criticidad", description = "Solo ADMINISTRADOR.")
+    @Operation(summary = "Actualiza umbrales de criticidad por item", description = "Solo ADMINISTRADOR.")
     @PatchMapping("/{id}/inventario/umbrales")
     @PreAuthorize("hasAuthority('INVENTARIO_UMBRALES')")
-    public InventarioCategoriaResponse actualizarUmbrales(
+    public InventarioItemResponse actualizarUmbrales(
             @PathVariable UUID id,
             @Valid @RequestBody ActualizarUmbralesInventarioRequest solicitud) {
         return servicioInventario.actualizarUmbrales(id, solicitud);
