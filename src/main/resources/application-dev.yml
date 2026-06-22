@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${MS_RESOURCES_DB_URL:jdbc:postgresql://localhost:5432/catastrofescl_resources}
+    url: ${MS_RESOURCES_DB_URL:jdbc:postgresql://localhost:5432/catastrofescl}
     username: ${MS_RESOURCES_DB_USER:catastrofescl}
     password: ${MS_RESOURCES_DB_PASSWORD:catastrofescl}
     driver-class-name: org.postgresql.Driver

@@ -29,9 +29,14 @@ public class StockCriticoEvento implements EventoDominio {
 
     private UUID inventarioId;
     private UUID centroId;
+    private UUID emergenciaId;
     private UUID itemCatalogoId;
     private CategoriaInventario categoria;
     private long stockActual;
+    private long umbralMinimo;
+    private long umbralOptimo;
+    // Deficit hasta el nivel necesario (umbral optimo): cuanto falta donar para cubrir la necesidad
+    private long cantidadSugerida;
     private EstadoCriticidad estadoCriticidad;
 
     @Override

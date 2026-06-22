@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class PublicadorEventos {
 
-    private static final String VERSION_EVENTO = "1.1";
+    private static final String VERSION_EVENTO = "1.2";
     private static final String FUENTE_EVENTO = "ms-resources";
 
     private final RabbitTemplate rabbitTemplate;
