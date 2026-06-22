@@ -7,6 +7,7 @@ import cl.catastrofescl.resources.dto.response.ResumenInventarioCategoriaRespons
 import cl.catastrofescl.resources.dto.response.RespuestaMovimientoInventarioResponse;
 import cl.catastrofescl.resources.entity.Categoria;
 import cl.catastrofescl.resources.entity.CategoriaInventario;
+import cl.catastrofescl.resources.entity.Centro;
 import cl.catastrofescl.resources.entity.EstadoCriticidad;
 import cl.catastrofescl.resources.entity.Inventario;
 import cl.catastrofescl.resources.entity.ItemCatalogo;
@@ -116,24 +117,47 @@ public class ServicioInventario {
     @CacheEvict(value = {ServicioMapData.CACHE_MAP_DATA, ServicioKpis.CACHE_KPIS}, allEntries = true)
     public RespuestaMovimientoInventarioResponse registrarMovimiento(UUID centroId,
                                                                      SolicitudMovimientoInventarioRequest solicitud) {
-        verificarCentroExiste(centroId);
-        ItemCatalogo item = repositorioCatalogoItems.findByIdAndActivoTrue(solicitud.itemCatalogoId())
-                .orElseThrow(() -> new ItemCatalogoNoEncontradoException(solicitud.itemCatalogoId()));
+        return aplicarMovimiento(centroId, solicitud.itemCatalogoId(), solicitud.tipoMovimiento(),
+                solicitud.cantidad(), contextoUsuario.usuarioIdActual());
+    }
+
+    /**
+     * Aplica un movimiento de inventario disparado por un evento interno (consumidor RabbitMQ),
+     * sin depender del contexto de seguridad HTTP. ms-resources es la unica fuente de verdad del stock.
+     */
+    @Transactional
+    @CacheEvict(value = {ServicioMapData.CACHE_MAP_DATA, ServicioKpis.CACHE_KPIS}, allEntries = true)
+    public RespuestaMovimientoInventarioResponse registrarMovimientoInterno(UUID centroId,
+                                                                            UUID itemCatalogoId,
+                                                                            TipoMovimiento tipoMovimiento,
+                                                                            long cantidad,
+                                                                            UUID usuarioId) {
+        return aplicarMovimiento(centroId, itemCatalogoId, tipoMovimiento, cantidad, usuarioId);
+    }
+
+    private RespuestaMovimientoInventarioResponse aplicarMovimiento(UUID centroId,
+                                                                    UUID itemCatalogoId,
+                                                                    TipoMovimiento tipoMovimiento,
+                                                                    long cantidad,
+                                                                    UUID usuarioId) {
+        Centro centro = repositorioCentros.findById(centroId)
+                .orElseThrow(() -> new CentroNoEncontradoException(centroId));
+        ItemCatalogo item = repositorioCatalogoItems.findByIdAndActivoTrue(itemCatalogoId)
+                .orElseThrow(() -> new ItemCatalogoNoEncontradoException(itemCatalogoId));
         Categoria categoria = repositorioCategorias.findById(item.getCategoriaId())
-                .orElseThrow(() -> new ItemCatalogoNoEncontradoException(solicitud.itemCatalogoId()));
+                .orElseThrow(() -> new ItemCatalogoNoEncontradoException(itemCatalogoId));
 
         Inventario inventario = repositorioInventario
-                .findByCentroIdAndItemCatalogoId(centroId, solicitud.itemCatalogoId())
-                .orElseThrow(() -> new InventarioNoEncontradoException(centroId, solicitud.itemCatalogoId()));
+                .findByCentroIdAndItemCatalogoId(centroId, itemCatalogoId)
+                .orElseThrow(() -> new InventarioNoEncontradoException(centroId, itemCatalogoId));
 
         long stockAnterior = inventario.getStockActual();
         EstadoCriticidad criticidadAnterior = inventario.getEstadoCriticidad();
-        long stockNuevo = calcularStockNuevo(stockAnterior, solicitud.tipoMovimiento(), solicitud.cantidad());
+        long stockNuevo = calcularStockNuevo(stockAnterior, tipoMovimiento, cantidad);
         inventario.setStockActual(stockNuevo);
         inventario.setEstadoCriticidad(calcularCriticidad(inventario));
 
         Inventario actualizado = repositorioInventario.save(inventario);
-        UUID usuarioId = contextoUsuario.usuarioIdActual();
         CategoriaInventario categoriaEnum = aCategoriaInventario(categoria.getCodigo());
 
         MovimientoInventario movimiento = MovimientoInventario.builder()
@@ -141,8 +165,8 @@ public class ServicioInventario {
                 .centroId(centroId)
                 .itemCatalogoId(item.getId())
                 .categoria(categoriaEnum)
-                .tipoMovimiento(solicitud.tipoMovimiento())
-                .cantidad(solicitud.cantidad())
+                .tipoMovimiento(tipoMovimiento)
+                .cantidad(cantidad)
                 .stockAnterior(stockAnterior)
                 .stockPosterior(stockNuevo)
                 .estadoCriticidadPosterior(actualizado.getEstadoCriticidad())
@@ -151,18 +175,17 @@ public class ServicioInventario {
         MovimientoInventario movimientoPersistido = repositorioMovimientosInventario.save(movimiento);
 
         log.info("Movimiento inventario centro={} item={} {} cantidad={} stock={}->{}",
-                centroId, item.getNombre(), solicitud.tipoMovimiento(),
-                solicitud.cantidad(), stockAnterior, stockNuevo);
+                centroId, item.getNombre(), tipoMovimiento, cantidad, stockAnterior, stockNuevo);
 
         publicarEventosTrasCommit(actualizado, movimientoPersistido, item, categoria,
-                stockAnterior, criticidadAnterior, usuarioId);
+                stockAnterior, criticidadAnterior, usuarioId, centro.getEmergenciaId());
 
         return new RespuestaMovimientoInventarioResponse(
                 item.getId(),
                 item.getNombre(),
                 categoria.getCodigo(),
-                solicitud.tipoMovimiento(),
-                solicitud.cantidad(),
+                tipoMovimiento,
+                cantidad,
                 stockAnterior,
                 actualizado.getStockActual(),
                 actualizado.getEstadoCriticidad(),
@@ -174,8 +197,14 @@ public class ServicioInventario {
     @CacheEvict(value = {ServicioMapData.CACHE_MAP_DATA, ServicioKpis.CACHE_KPIS}, allEntries = true)
     public InventarioItemResponse actualizarUmbrales(UUID centroId,
                                                      ActualizarUmbralesInventarioRequest solicitud) {
-        verificarCentroExiste(centroId);
+        Centro centro = repositorioCentros.findById(centroId)
+                .orElseThrow(() -> new CentroNoEncontradoException(centroId));
         validarUmbrales(solicitud.umbralMinimo(), solicitud.umbralOptimo(), solicitud.umbralMaximo());
+
+        ItemCatalogo item = repositorioCatalogoItems.findById(solicitud.itemCatalogoId())
+                .orElseThrow(() -> new ItemCatalogoNoEncontradoException(solicitud.itemCatalogoId()));
+        Categoria categoria = repositorioCategorias.findById(item.getCategoriaId())
+                .orElseThrow(() -> new ItemCatalogoNoEncontradoException(solicitud.itemCatalogoId()));
 
         Inventario inventario = repositorioInventario
                 .findByCentroIdAndItemCatalogoId(centroId, solicitud.itemCatalogoId())
@@ -187,6 +216,13 @@ public class ServicioInventario {
         inventario.setEstadoCriticidad(calcularCriticidad(inventario));
 
         Inventario guardado = repositorioInventario.save(inventario);
+
+        // Al configurar el stock necesario (umbrales) de un centro, si el item queda en estado
+        // critico/agotado se levanta la necesidad publicando stock.critical con el deficit.
+        if (esCritico(guardado.getEstadoCriticidad())) {
+            publicarStockCriticoTrasCommit(guardado, item, categoria, centro.getEmergenciaId());
+        }
+
         return mapearFilasInventario(List.of(guardado)).getFirst();
     }
 
@@ -213,7 +249,8 @@ public class ServicioInventario {
                                            Categoria categoria,
                                            long stockAnterior,
                                            EstadoCriticidad criticidadAnterior,
-                                           UUID usuarioId) {
+                                           UUID usuarioId,
+                                           UUID emergenciaId) {
         CategoriaInventario categoriaEnum = aCategoriaInventario(categoria.getCodigo());
         Runnable accion = () -> {
             OffsetDateTime ahora = OffsetDateTime.now();
@@ -255,22 +292,54 @@ public class ServicioInventario {
 
             if (esCritico(inventario.getEstadoCriticidad())
                     && !esCritico(criticidadAnterior)) {
-                publicadorEventos.publicar(StockCriticoEvento.builder()
-                        .eventoId(UUID.randomUUID())
-                        .ocurridoEn(ahora)
-                        .correlacionId(correlacion)
-                        .versionEvento(PublicadorEventos.versionEvento())
-                        .fuente(PublicadorEventos.fuenteEvento())
-                        .inventarioId(inventario.getId())
-                        .centroId(inventario.getCentroId())
-                        .itemCatalogoId(item.getId())
-                        .categoria(categoriaEnum)
-                        .stockActual(inventario.getStockActual())
-                        .estadoCriticidad(inventario.getEstadoCriticidad())
-                        .build());
+                publicadorEventos.publicar(construirStockCritico(inventario, item, categoriaEnum,
+                        emergenciaId, correlacion, ahora));
             }
         };
 
+        ejecutarTrasCommit(accion);
+    }
+
+    private void publicarStockCriticoTrasCommit(Inventario inventario,
+                                                ItemCatalogo item,
+                                                Categoria categoria,
+                                                UUID emergenciaId) {
+        CategoriaInventario categoriaEnum = aCategoriaInventario(categoria.getCodigo());
+        ejecutarTrasCommit(() -> {
+            OffsetDateTime ahora = OffsetDateTime.now();
+            String correlacion = inventario.getId().toString();
+            publicadorEventos.publicar(construirStockCritico(inventario, item, categoriaEnum,
+                    emergenciaId, correlacion, ahora));
+        });
+    }
+
+    private StockCriticoEvento construirStockCritico(Inventario inventario,
+                                                     ItemCatalogo item,
+                                                     CategoriaInventario categoriaEnum,
+                                                     UUID emergenciaId,
+                                                     String correlacion,
+                                                     OffsetDateTime ahora) {
+        long cantidadSugerida = Math.max(0L, inventario.getUmbralOptimo() - inventario.getStockActual());
+        return StockCriticoEvento.builder()
+                .eventoId(UUID.randomUUID())
+                .ocurridoEn(ahora)
+                .correlacionId(correlacion)
+                .versionEvento(PublicadorEventos.versionEvento())
+                .fuente(PublicadorEventos.fuenteEvento())
+                .inventarioId(inventario.getId())
+                .centroId(inventario.getCentroId())
+                .emergenciaId(emergenciaId)
+                .itemCatalogoId(item.getId())
+                .categoria(categoriaEnum)
+                .stockActual(inventario.getStockActual())
+                .umbralMinimo(inventario.getUmbralMinimo())
+                .umbralOptimo(inventario.getUmbralOptimo())
+                .cantidadSugerida(cantidadSugerida)
+                .estadoCriticidad(inventario.getEstadoCriticidad())
+                .build();
+    }
+
+    private void ejecutarTrasCommit(Runnable accion) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override

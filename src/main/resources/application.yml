@@ -16,6 +16,7 @@ spring:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
+    table: flyway_schema_history_ms_resources
   jackson:
     default-property-inclusion: non_null
     serialization:
@@ -48,6 +49,10 @@ catastrofescl:
     exchange-dlx: catastrofescl.dlx
     cola-emergencia-creada: ms-resources.emergencia-creada
     cola-emergencia-creada-dlq: ms-resources.emergencia-creada.dlq
+    cola-donacion-confirmada: ms-resources.donacion-confirmada
+    cola-donacion-confirmada-dlq: ms-resources.donacion-confirmada.dlq
+    cola-transferencia-estado: ms-resources.transferencia-estado
+    cola-transferencia-estado-dlq: ms-resources.transferencia-estado.dlq
   firebase:
     enabled: ${FIREBASE_ENABLED:true}
     project-id: ${FIREBASE_PROJECT_ID:catastrofecl-cc6bd}
