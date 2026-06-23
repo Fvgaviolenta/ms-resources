@@ -93,6 +93,15 @@ public class ManejadorGlobalExcepciones {
         return detalle;
     }
 
+    @ExceptionHandler(EmergenciaNoValidaException.class)
+    public ProblemDetail manejarEmergenciaNoValida(EmergenciaNoValidaException ex, HttpServletRequest request) {
+        ProblemDetail detalle = base(HttpStatus.BAD_REQUEST, "Emergencia no valida",
+                ex.getMessage(), "invalid-emergency", request);
+        detalle.setProperty("errorCode", "INVALID_EMERGENCY");
+        detalle.setProperty("emergenciaId", ex.getEmergenciaId());
+        return detalle;
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail manejarValidacion(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> errores = new HashMap<>();

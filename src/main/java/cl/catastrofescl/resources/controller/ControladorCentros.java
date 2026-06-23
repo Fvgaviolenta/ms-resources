@@ -26,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -104,6 +105,14 @@ public class ControladorCentros {
     public CentroResponse actualizar(@PathVariable UUID id,
                                      @Valid @RequestBody ActualizarCentroRequest solicitud) {
         return servicioCentros.actualizar(id, solicitud);
+    }
+
+    @Operation(summary = "Borrado logico de un centro", description = "Marca el centro como CERRADO; conserva el historial.")
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('CENTRO_GESTIONAR')")
+    public ResponseEntity<Void> eliminar(@PathVariable UUID id) {
+        servicioCentros.eliminar(id);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Inventario por item del centro")

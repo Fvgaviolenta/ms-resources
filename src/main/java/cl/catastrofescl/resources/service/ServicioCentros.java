@@ -1,5 +1,6 @@
 package cl.catastrofescl.resources.service;
 
+import cl.catastrofescl.resources.cliente.ClienteEmergencias;
 import cl.catastrofescl.resources.dto.request.ActualizarCentroRequest;
 import cl.catastrofescl.resources.dto.request.CrearCentroRequest;
 import cl.catastrofescl.resources.dto.response.CentroResponse;
@@ -29,6 +30,7 @@ public class ServicioCentros {
     private final GeometriaMapper geometriaMapper;
     private final MapeadorCentros mapeadorCentros;
     private final ContextoUsuario contextoUsuario;
+    private final ClienteEmergencias clienteEmergencias;
 
     @Transactional
     public CentroResponse crear(CrearCentroRequest solicitud) {
@@ -133,7 +135,27 @@ public class ServicioCentros {
         if (solicitud.estado() != null) {
             centro.setEstado(solicitud.estado());
         }
+        if (solicitud.emergenciaId() != null
+                && !solicitud.emergenciaId().equals(centro.getEmergenciaId())) {
+            // Validar contra ms-emergencies antes de asociar (debe existir y estar ACTIVA).
+            clienteEmergencias.validarActiva(solicitud.emergenciaId());
+            centro.setEmergenciaId(solicitud.emergenciaId());
+            log.info("Centro id={} asociado a emergencia id={}", centro.getId(), solicitud.emergenciaId());
+        }
 
         return mapeadorCentros.aResponse(repositorioCentros.save(centro));
+    }
+
+    /**
+     * Borrado logico de un centro: lo marca como {@link EstadoCentro#CERRADO} para conservar el
+     * historial (inventario, movimientos, operadores) y dejarlo fuera de las listas operativas.
+     */
+    @Transactional
+    public void eliminar(UUID id) {
+        Centro centro = repositorioCentros.findById(id)
+                .orElseThrow(() -> new CentroNoEncontradoException(id));
+        centro.setEstado(EstadoCentro.CERRADO);
+        repositorioCentros.save(centro);
+        log.info("Centro id={} marcado como CERRADO (borrado logico)", id);
     }
 }
