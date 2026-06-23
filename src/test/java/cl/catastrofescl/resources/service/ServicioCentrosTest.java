@@ -1,5 +1,6 @@
 package cl.catastrofescl.resources.service;
 
+import cl.catastrofescl.resources.cliente.ClienteEmergencias;
 import cl.catastrofescl.resources.dto.CoordenadaDto;
 import cl.catastrofescl.resources.dto.request.CrearCentroRequest;
 import cl.catastrofescl.resources.dto.response.CentroResponse;
@@ -30,6 +31,8 @@ class ServicioCentrosTest {
     private ServicioInventario servicioInventario;
     @Mock
     private ContextoUsuario contextoUsuario;
+    @Mock
+    private ClienteEmergencias clienteEmergencias;
 
     private GeometriaMapper geometriaMapper;
     private MapeadorCentros mapeadorCentros;
@@ -42,7 +45,7 @@ class ServicioCentrosTest {
         geometriaMapper = new GeometriaMapper();
         mapeadorCentros = new MapeadorCentros(geometriaMapper);
         servicio = new ServicioCentros(repositorioCentros, servicioInventario, geometriaMapper,
-                mapeadorCentros, contextoUsuario);
+                mapeadorCentros, contextoUsuario, clienteEmergencias);
     }
 
     @Test

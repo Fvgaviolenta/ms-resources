@@ -16,11 +16,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.List;
 
 @Slf4j
 @Configuration
@@ -33,9 +28,6 @@ public class SeguridadConfig {
     @Value("${catastrofescl.firebase.enabled:false}")
     private boolean firebaseEnabled;
 
-    @Value("${catastrofescl.cors.allowed-origins:http://localhost:3000}")
-    private List<String> origenesPermitidos;
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    ProveedorPermisos proveedorPermisos,
@@ -44,7 +36,9 @@ public class SeguridadConfig {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // CORS se centraliza en el API Gateway. Si el MS tambien define CORS, el header
+                // Access-Control-Allow-Origin se duplica y el navegador rechaza la respuesta.
+                .cors(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/centros").permitAll()
@@ -75,20 +69,5 @@ public class SeguridadConfig {
         }
 
         return http.build();
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration cors = new CorsConfiguration();
-        cors.setAllowedOrigins(origenesPermitidos);
-        cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        cors.setAllowedHeaders(List.of("*"));
-        cors.setExposedHeaders(List.of("Location"));
-        cors.setAllowCredentials(true);
-        cors.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource fuente = new UrlBasedCorsConfigurationSource();
-        fuente.registerCorsConfiguration("/**", cors);
-        return fuente;
     }
 }

@@ -44,6 +44,8 @@ management:
       show-details: when-authorized
 
 catastrofescl:
+  emergencies:
+    base-url: ${MS_EMERGENCIES_BASE_URL:http://ms-emergencies:8082}
   rabbitmq:
     exchange-topic: catastrofescl.events
     exchange-dlx: catastrofescl.dlx
