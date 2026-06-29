@@ -30,4 +30,4 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.login-ecr.outputs.registry }}/catastrofescl-ms-resources:latest
-#DEPLOY AWS ECS
+#DEPLOY AWS ECS PRUEBA 2
