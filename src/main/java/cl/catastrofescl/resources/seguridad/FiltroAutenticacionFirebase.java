@@ -7,7 +7,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -17,19 +16,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
- * Filtro de autenticacion para PROD.
- * Valida el Firebase ID Token (Bearer) y extrae el UID + custom claims {@code roles}/{@code role}.
- * Los valores se normalizan con {@link MapeadorRolesFirebase} (ej. ADMIN -> ADMINISTRADOR).
- * Los permisos se resuelven via {@link ProveedorPermisos}.
+ * Filtro de autenticacion para PROD con fallback de roles de laboratorio.
  */
 @Slf4j
-@RequiredArgsConstructor
 public class FiltroAutenticacionFirebase extends OncePerRequestFilter {
 
     private static final String AUTHORIZATION = "Authorization";
@@ -37,6 +34,21 @@ public class FiltroAutenticacionFirebase extends OncePerRequestFilter {
 
     private final FirebaseAuth firebaseAuth;
     private final ProveedorPermisos proveedorPermisos;
+    private final String rolesPorDefectoSiSinClaims;
+
+    public FiltroAutenticacionFirebase(FirebaseAuth firebaseAuth, ProveedorPermisos proveedorPermisos) {
+        this(firebaseAuth, proveedorPermisos, "");
+    }
+
+    public FiltroAutenticacionFirebase(FirebaseAuth firebaseAuth,
+                                       ProveedorPermisos proveedorPermisos,
+                                       String rolesPorDefectoSiSinClaims) {
+        this.firebaseAuth = firebaseAuth;
+        this.proveedorPermisos = proveedorPermisos;
+        this.rolesPorDefectoSiSinClaims = rolesPorDefectoSiSinClaims != null
+                ? rolesPorDefectoSiSinClaims.trim()
+                : "";
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -53,6 +65,11 @@ public class FiltroAutenticacionFirebase extends OncePerRequestFilter {
             FirebaseToken token = firebaseAuth.verifyIdToken(idToken);
 
             Set<String> rolesDeclarados = extraerRoles(token);
+            if (rolesDeclarados.isEmpty() && StringUtils.hasText(rolesPorDefectoSiSinClaims)) {
+                rolesDeclarados = leerRolesDesdeLista(rolesPorDefectoSiSinClaims);
+                log.warn("Token Firebase sin roles; usando roles por defecto de laboratorio uid={} roles={}",
+                        token.getUid(), rolesDeclarados);
+            }
             Set<String> rolesInternos = MapeadorRolesFirebase.normalizar(rolesDeclarados);
             Set<String> permisos = proveedorPermisos.permisosPara(rolesDeclarados);
             UUID usuarioId = UUID.nameUUIDFromBytes(("firebase:" + token.getUid()).getBytes());
@@ -89,12 +106,17 @@ public class FiltroAutenticacionFirebase extends OncePerRequestFilter {
             }
             return roles;
         }
-        // Compatibilidad con el claim antiguo "role" (string simple)
         Object legacy = token.getClaims().get("role");
         if (legacy instanceof String rol && StringUtils.hasText(rol)) {
             return Set.of(rol);
         }
         return Set.of();
     }
-}
 
+    private Set<String> leerRolesDesdeLista(String listaSeparadaPorComa) {
+        return Arrays.stream(listaSeparadaPorComa.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(HashSet::new));
+    }
+}

@@ -4,7 +4,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -21,41 +20,55 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Filtro de autenticacion para ENTORNO DE DESARROLLO.
- *
- * <p>Reemplaza a Firebase cuando todavia no se integra. Lee dos headers:</p>
- * <ul>
- *   <li><b>X-Dev-Firebase-Uid</b>: UID simulado del usuario (obligatorio).</li>
- *   <li><b>X-Dev-Roles</b>: roles separados por coma; acepta internos o aliases Firebase ({@code ADMINISTRADOR} o {@code ADMIN}).</li>
- *   <li><b>X-Dev-Usuario-Id</b>: UUID interno opcional. Si no se envia se genera uno estable a partir del UID.</li>
- * </ul>
- *
- * <p>Si los headers no estan presentes, la peticion sigue sin autenticacion
- * y los endpoints protegidos responderan 401/403.</p>
+ * Filtro de autenticacion para ENTORNO DE DESARROLLO / laboratorio.
  */
 @Slf4j
-@RequiredArgsConstructor
 public class FiltroAutenticacionDev extends OncePerRequestFilter {
 
     public static final String HEADER_UID = "X-Dev-Firebase-Uid";
     public static final String HEADER_ROLES = "X-Dev-Roles";
     public static final String HEADER_USUARIO_ID = "X-Dev-Usuario-Id";
+    public static final String HEADER_GATEWAY_FIREBASE_UID = "X-Firebase-Uid";
 
     private final ProveedorPermisos proveedorPermisos;
+    private final boolean trustGatewayFirebaseHeaders;
+    private final String devDefaultRoleForGateway;
+
+    public FiltroAutenticacionDev(ProveedorPermisos proveedorPermisos) {
+        this(proveedorPermisos, false, ProveedorPermisos.ROL_AUTORIDAD);
+    }
+
+    public FiltroAutenticacionDev(ProveedorPermisos proveedorPermisos,
+                                  boolean trustGatewayFirebaseHeaders,
+                                  String devDefaultRoleForGateway) {
+        this.proveedorPermisos = proveedorPermisos;
+        this.trustGatewayFirebaseHeaders = trustGatewayFirebaseHeaders;
+        this.devDefaultRoleForGateway = devDefaultRoleForGateway != null && !devDefaultRoleForGateway.isBlank()
+                ? devDefaultRoleForGateway.trim()
+                : ProveedorPermisos.ROL_AUTORIDAD;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String uid = request.getHeader(HEADER_UID);
+        if (!StringUtils.hasText(uid) && trustGatewayFirebaseHeaders) {
+            uid = request.getHeader(HEADER_GATEWAY_FIREBASE_UID);
+        }
         if (!StringUtils.hasText(uid)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        Set<String> declarados = leerRoles(request.getHeader(HEADER_ROLES));
-        Set<String> rolesInternos = MapeadorRolesFirebase.normalizar(declarados);
-        Set<String> permisos = proveedorPermisos.permisosPara(declarados);
+        Set<String> rolesDeclarados = leerRoles(request.getHeader(HEADER_ROLES));
+        if (rolesDeclarados.isEmpty() && trustGatewayFirebaseHeaders
+                && StringUtils.hasText(request.getHeader(HEADER_GATEWAY_FIREBASE_UID))
+                && !StringUtils.hasText(request.getHeader(HEADER_UID))) {
+            rolesDeclarados = leerRoles(devDefaultRoleForGateway);
+        }
+        Set<String> rolesInternos = MapeadorRolesFirebase.normalizar(rolesDeclarados);
+        Set<String> permisos = proveedorPermisos.permisosPara(rolesDeclarados);
         UUID usuarioId = resolverUsuarioId(request.getHeader(HEADER_USUARIO_ID), uid);
 
         UsuarioAutenticado principal = new UsuarioAutenticado(uid, usuarioId, rolesInternos, permisos);
@@ -92,8 +105,6 @@ public class FiltroAutenticacionDev extends OncePerRequestFilter {
                 log.warn("X-Dev-Usuario-Id invalido, se ignorara: {}", headerExplicito);
             }
         }
-        // UUID determinista en base al UID para que repetir el UID siempre apunte al mismo usuarioId
         return UUID.nameUUIDFromBytes(("dev:" + uidFallback).getBytes());
     }
 }
-

@@ -61,6 +61,8 @@ catastrofescl:
     credentials-path: ${FIREBASE_CREDENTIALS_PATH:/secrets/catastrofecl-cc6bd-firebase-adminsdk-fbsvc-d9b70d6453.json}
   auth:
     dev-mode: false
+    dev-trust-gateway-firebase-headers: false
+    dev-default-role-for-gateway: ""
     public-paths:
       - /centros
       - /centros/cercanos
