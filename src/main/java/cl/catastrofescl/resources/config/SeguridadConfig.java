@@ -63,7 +63,11 @@ public class SeguridadConfig {
             }
             log.info("Seguridad ms-resources con FiltroAutenticacionFirebase");
             http.addFilterBefore(
-                    new FiltroAutenticacionFirebase(firebaseAuth, proveedorPermisos, devDefaultRoleForGateway),
+                    new FiltroAutenticacionFirebase(
+                            firebaseAuth,
+                            proveedorPermisos,
+                            devDefaultRoleForGateway,
+                            devTrustGatewayFirebaseHeaders),
                     UsernamePasswordAuthenticationFilter.class);
         } else if (devMode) {
             log.warn("Seguridad ms-resources en MODO DEV (X-Dev-* / gateway). NO usar en produccion.");

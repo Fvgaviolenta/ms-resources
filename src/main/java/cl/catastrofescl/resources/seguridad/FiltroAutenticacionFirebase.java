@@ -16,15 +16,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
- * Filtro de autenticacion para PROD con fallback de roles de laboratorio.
+ * Filtro de autenticacion para PROD / laboratorio con Firebase.
  */
 @Slf4j
 public class FiltroAutenticacionFirebase extends OncePerRequestFilter {
@@ -35,88 +33,104 @@ public class FiltroAutenticacionFirebase extends OncePerRequestFilter {
     private final FirebaseAuth firebaseAuth;
     private final ProveedorPermisos proveedorPermisos;
     private final String rolesPorDefectoSiSinClaims;
+    private final boolean confiarHeadersGateway;
 
     public FiltroAutenticacionFirebase(FirebaseAuth firebaseAuth, ProveedorPermisos proveedorPermisos) {
-        this(firebaseAuth, proveedorPermisos, "");
+        this(firebaseAuth, proveedorPermisos, "", false);
     }
 
     public FiltroAutenticacionFirebase(FirebaseAuth firebaseAuth,
                                        ProveedorPermisos proveedorPermisos,
-                                       String rolesPorDefectoSiSinClaims) {
+                                       String rolesPorDefectoSiSinClaims,
+                                       boolean confiarHeadersGateway) {
         this.firebaseAuth = firebaseAuth;
         this.proveedorPermisos = proveedorPermisos;
         this.rolesPorDefectoSiSinClaims = rolesPorDefectoSiSinClaims != null
                 ? rolesPorDefectoSiSinClaims.trim()
                 : "";
+        this.confiarHeadersGateway = confiarHeadersGateway;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            autenticarDesdeBearer(request);
+            if (SecurityContextHolder.getContext().getAuthentication() == null && confiarHeadersGateway) {
+                autenticarDesdeGateway(request);
+            }
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private void autenticarDesdeBearer(HttpServletRequest request) {
         String header = request.getHeader(AUTHORIZATION);
         if (!StringUtils.hasText(header) || !header.startsWith(BEARER)) {
-            filterChain.doFilter(request, response);
             return;
         }
 
         String idToken = header.substring(BEARER.length()).trim();
         try {
             FirebaseToken token = firebaseAuth.verifyIdToken(idToken);
-
-            Set<String> rolesDeclarados = extraerRoles(token);
-            if (rolesDeclarados.isEmpty() && StringUtils.hasText(rolesPorDefectoSiSinClaims)) {
-                rolesDeclarados = leerRolesDesdeLista(rolesPorDefectoSiSinClaims);
-                log.warn("Token Firebase sin roles; usando roles por defecto de laboratorio uid={} roles={}",
-                        token.getUid(), rolesDeclarados);
-            }
-            Set<String> rolesInternos = MapeadorRolesFirebase.normalizar(rolesDeclarados);
-            Set<String> permisos = proveedorPermisos.permisosPara(rolesDeclarados);
-            UUID usuarioId = UUID.nameUUIDFromBytes(("firebase:" + token.getUid()).getBytes());
-
-            UsuarioAutenticado principal =
-                    new UsuarioAutenticado(token.getUid(), usuarioId, rolesInternos, permisos);
-
-            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-            permisos.forEach(p -> authorities.add(new SimpleGrantedAuthority(p)));
-            rolesInternos.forEach(r -> authorities.add(new SimpleGrantedAuthority("ROLE_" + r)));
-
-            UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(principal, null, authorities);
-            SecurityContextHolder.getContext().setAuthentication(auth);
-
-            log.debug("Autenticacion Firebase aplicada uid={} roles={}", token.getUid(), rolesInternos);
+            Set<String> rolesDeclarados = resolverRoles(token, request);
+            establecerAutenticacion(token.getUid(), rolesDeclarados);
+            log.debug("Autenticacion Firebase aplicada uid={} roles={}", token.getUid(), rolesDeclarados);
         } catch (FirebaseAuthException ex) {
             log.warn("Token Firebase invalido: {}", ex.getMessage());
             SecurityContextHolder.clearContext();
         }
-
-        filterChain.doFilter(request, response);
     }
 
-    @SuppressWarnings("unchecked")
-    private Set<String> extraerRoles(FirebaseToken token) {
-        Object claim = token.getClaims().get("roles");
-        if (claim instanceof List<?> lista) {
-            Set<String> roles = new HashSet<>();
-            for (Object r : lista) {
-                if (r != null) {
-                    roles.add(r.toString());
-                }
-            }
-            return roles;
+    private void autenticarDesdeGateway(HttpServletRequest request) {
+        String uid = request.getHeader(FiltroAutenticacionDev.HEADER_GATEWAY_FIREBASE_UID);
+        if (!StringUtils.hasText(uid)) {
+            return;
         }
-        Object legacy = token.getClaims().get("role");
-        if (legacy instanceof String rol && StringUtils.hasText(rol)) {
-            return Set.of(rol);
+
+        Set<String> rolesDeclarados = new HashSet<>();
+        rolesDeclarados.addAll(LectorRolesDeclarados.desdeListaSeparadaPorComa(
+                request.getHeader(FiltroAutenticacionDev.HEADER_ROLES)));
+        if (rolesDeclarados.isEmpty() && StringUtils.hasText(rolesPorDefectoSiSinClaims)) {
+            rolesDeclarados.addAll(LectorRolesDeclarados.desdeListaSeparadaPorComa(rolesPorDefectoSiSinClaims));
+            log.warn("Autenticacion por gateway sin roles; usando roles por defecto uid={} roles={}",
+                    uid, rolesDeclarados);
         }
-        return Set.of();
+        if (rolesDeclarados.isEmpty()) {
+            return;
+        }
+
+        establecerAutenticacion(uid.trim(), rolesDeclarados);
     }
 
-    private Set<String> leerRolesDesdeLista(String listaSeparadaPorComa) {
-        return Arrays.stream(listaSeparadaPorComa.split(","))
-                .map(String::trim)
-                .filter(StringUtils::hasText)
-                .collect(Collectors.toCollection(HashSet::new));
+    private Set<String> resolverRoles(FirebaseToken token, HttpServletRequest request) {
+        Set<String> rolesDeclarados = new HashSet<>(LectorRolesDeclarados.desdeClaimsFirebase(token.getClaims()));
+        if (rolesDeclarados.isEmpty()) {
+            rolesDeclarados.addAll(LectorRolesDeclarados.desdeListaSeparadaPorComa(
+                    request.getHeader(FiltroAutenticacionDev.HEADER_ROLES)));
+        }
+        if (rolesDeclarados.isEmpty() && StringUtils.hasText(rolesPorDefectoSiSinClaims)) {
+            rolesDeclarados.addAll(LectorRolesDeclarados.desdeListaSeparadaPorComa(rolesPorDefectoSiSinClaims));
+            log.warn("Token Firebase sin roles; usando roles por defecto de laboratorio uid={} roles={}",
+                    token.getUid(), rolesDeclarados);
+        }
+        return rolesDeclarados;
+    }
+
+    private void establecerAutenticacion(String uid, Set<String> rolesDeclarados) {
+        Set<String> rolesInternos = MapeadorRolesFirebase.normalizar(rolesDeclarados);
+        Set<String> permisos = proveedorPermisos.permisosPara(rolesDeclarados);
+        UUID usuarioId = UUID.nameUUIDFromBytes(("firebase:" + uid).getBytes());
+
+        UsuarioAutenticado principal = new UsuarioAutenticado(uid, usuarioId, rolesInternos, permisos);
+
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        permisos.forEach(p -> authorities.add(new SimpleGrantedAuthority(p)));
+        rolesInternos.forEach(r -> authorities.add(new SimpleGrantedAuthority("ROLE_" + r)));
+
+        UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(principal, null, authorities);
+        SecurityContextHolder.getContext().setAuthentication(auth);
     }
 }
